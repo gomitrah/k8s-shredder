@@ -2,32 +2,36 @@ name: CI tests
 on: pull_request
 
 jobs:
-  # 1. New job to dynamically find the latest 3 K8s versions
+  # 1. Dynamically find the 3 most recent k8s minor versions that actually
+  #    have a published kindest/node image (avoids "manifest unknown" errors
+  #    caused by kind lagging behind new k8s releases).
   get-versions:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Fetch Latest K8s Versions
+      - name: Fetch available kindest/node tags
         id: set-matrix
         run: |
-          # Fetch the latest stable releases dynamically from official channels
-          V1=$(curl -s https://dl.k8s.io/release/stable.txt)
-          # Deduce previous two minor channels cleanly
-          MAJOR_MINOR=$(echo $V1 | cut -d. -f1-2)
-          V2_MIN=$(( $(echo $V1 | cut -d. -f2) - 1 ))
-          V3_MIN=$(( $(echo $V1 | cut -d. -f2) - 2 ))
-          
-          V2="v1.${V2_MIN}.0"
-          V3="v1.${V3_MIN}.0"
+          set -euo pipefail
 
-          # Format securely into a compact JSON array string
-          VERSIONS=$(jq -n -c --arg v1 "$V1" --arg v2 "$V2" --arg v3 "$V3" '[$v1, $v2, $v3]')
-          
+          # Pull all published tags for kindest/node from Docker Hub
+          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/kindest/node/tags?page_size=100" \
+            | jq -r '.results[].name' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$')
+
+          # Keep only the newest patch per minor, sort descending, take top 3 minors
+          TOP3=$(echo "$TAGS" \
+            | sort -t. -k1,1V -k2,2V -k3,3V -r \
+            | awk -F. '!seen[$1"."$2]++' \
+            | head -n 3)
+
+          VERSIONS=$(echo "$TOP3" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
           echo "Found versions: $VERSIONS"
-          echo "matrix=$VERSIONS" >> $GITHUB_OUTPUT
+          echo "matrix=$VERSIONS" >> "$GITHUB_OUTPUT"
 
-  # 2. Your test job consuming the dynamic list
+  # 2. Run e2e tests across those versions and all three environments
   ci:
     needs: get-versions
     runs-on: ubuntu-latest
@@ -62,6 +66,8 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
+          # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
+          # version: v1.46
           args: -v --timeout 5m ./...
 
       - name: Install k8s Kind Cluster
