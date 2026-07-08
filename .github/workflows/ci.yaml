@@ -52,7 +52,6 @@ jobs:
           echo "$TOP3"
 
           VERSIONS=$(echo "$TOP3" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-
           echo "matrix=$VERSIONS" >> "$GITHUB_OUTPUT"
 
   # 2. Run e2e tests across those versions and all three environments
