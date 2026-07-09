@@ -4,3 +4,5 @@ linters:
     govet:
       disable:
         - inline
+  enable:
+   - govet
