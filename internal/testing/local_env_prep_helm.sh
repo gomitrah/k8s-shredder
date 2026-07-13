@@ -68,6 +68,11 @@ kubectl apply -f "${test_dir}/prometheus_stuffs.yaml"
 echo "KIND: deploying Argo Rollouts CRD..."
 kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-rollouts/v1.7.2/manifests/crds/rollout-crd.yaml
 
+# Wait for the API server to actually register the Rollout type before
+# anything tries to create a Rollout object — apply returning 0 only
+# means the CRD object was written, not that it's servable yet.
+kubectl wait --for=condition=Established --timeout=60s crd/rollouts.argoproj.io
+
 echo "KIND: deploying test applications..."
 kubectl apply -f "${test_dir}/test_apps.yaml"
 
