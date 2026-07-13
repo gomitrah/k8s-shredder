@@ -17,7 +17,7 @@ jobs:
           set -euo pipefail
 
           ALL_TAGS=""
-          URL="https://hub.docker.com/v2/repositories/kindest/node/tags?page=2&page_size=100"
+          URL="https://hub.docker.com/v2/repositories/kindest/node/tags?page=1&page_size=100"
           PAGE=0
           while [ -n "$URL" ] && [ "$URL" != "null" ] && [ "$PAGE" -lt 20 ]; do
             PAGE=$((PAGE + 1))
