@@ -68,10 +68,25 @@ kubectl apply -f "${test_dir}/prometheus_stuffs.yaml"
 echo "KIND: deploying Argo Rollouts CRD..."
 kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-rollouts/v1.7.2/manifests/crds/rollout-crd.yaml
 
-# Wait for the API server to actually register the Rollout type before
-# anything tries to create a Rollout object — apply returning 0 only
-# means the CRD object was written, not that it's servable yet.
-kubectl wait --for=condition=Established --timeout=60s crd/rollouts.argoproj.io
+# Poll until the CRD is Established. Deliberately not using
+# `kubectl wait` here — it can throw an accessor error if it catches
+# status.conditions while still nil, immediately after creation.
+echo "KIND: waiting for Rollout CRD to become Established..."
+crd_ready=""
+for i in $(seq 1 60); do
+  crd_ready=$(kubectl get crd rollouts.argoproj.io \
+    -o jsonpath='{.status.conditions[?(@.type=="Established")].status}' 2>/dev/null)
+  if [[ "${crd_ready}" == "True" ]]; then
+    echo "CRD established."
+    break
+  fi
+  sleep 1
+done
+
+if [[ "${crd_ready}" != "True" ]]; then
+  echo "ERROR: Rollout CRD did not become Established within 60s" >&2
+  exit 1
+fi
 
 echo "KIND: deploying test applications..."
 kubectl apply -f "${test_dir}/test_apps.yaml"
