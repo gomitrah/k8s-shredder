@@ -70,7 +70,7 @@ kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-rollouts/v1.7.2
 
 echo "Waiting for Argo Rollouts CRD to become established..."
 until [ "$(kubectl get crd rollouts.argoproj.io -o jsonpath='{.status.conditions[?(@.type=="Established")].status}' 2>/dev/null)" = "True" ]; do
-    sleep 1
+    sleep 2
 done
 
 echo "KIND: deploying test applications..."
